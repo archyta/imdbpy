@@ -95,14 +95,14 @@ class IMDbS3AccessSystem(IMDbBase):
         tb = self.T['title_basics']
         movie = tb.select(tb.c.tconst == movieID).execute().fetchone() or {}
         data = self._rename('title_basics', dict(movie))
-        data['year'] = str(data.get('startYear') or '')
-        if 'endYear' in data and data['endYear']:
-            data['year'] += '-%s' % data['endYear']
+        # data['year'] = str(data.get('startYear') or '')
+        # if 'endYear' in data and data['endYear']:
+        #     data['year'] += '-%s' % data['endYear']
         genres = data.get('genres') or ''
         data['genres'] = split_array(genres.lower())
         if 'runtimes' in data and data['runtimes']:
             data['runtimes'] = [data['runtimes']]
-        self._clean(data, ('startYear', 'endYear', 'movieID'))
+        # self._clean(data, ('startYear', 'endYear', 'movieID'))
         movies_cache[movieID] = data
         return data
 
@@ -161,6 +161,30 @@ class IMDbS3AccessSystem(IMDbBase):
             te_data['episodes of'] = self._base_title_info(te_data['parentTconst'])
         self._clean(te_data, ('parentTconst',))
         data.update(te_data)
+
+        # search parentTconst, construct episodes data
+        episodes = te.select(te.c.parentTconst == movieID).execute().fetchall() or {}
+        if episodes:
+            episodes.sort(key=itemgetter('seasonNumber', 'episodeNumber'))
+            # 构造seasons数据域
+            seasons = {}
+            seasonset = set()
+            for episode in episodes:
+                # 根据episode的tconst查找title_basics表，获取episode的基本信息
+                ep_info = self._base_title_info(episode['tconst'])
+                ep_info['episodeNumber'] = episode['episodeNumber'] or 0
+                ep_info['seasonNumber'] = episode['seasonNumber'] or 0
+                ep_info['episode of'] = data
+                episode = dict(ep_info)
+                season = episode.get('seasonNumber')
+                if not season:
+                    continue
+                seasons.setdefault(season, {}).setdefault(ep_info['episodeNumber'], episode)
+                seasonset.add(season)
+            season_list = sorted(seasonset)
+            data['episodes'] = seasons
+            data['seasons'] = season_list
+
 
         tp = self.T['title_principals']
         movie_rows = tp.select(tp.c.tconst == movieID).execute().fetchall() or {}
