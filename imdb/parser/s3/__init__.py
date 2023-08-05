@@ -171,15 +171,17 @@ class IMDbS3AccessSystem(IMDbBase):
             seasonset = set()
             for episode in episodes:
                 # 根据episode的tconst查找title_basics表，获取episode的基本信息
-                ep_info = self._base_title_info(episode['tconst'])
-                ep_info['episodeNumber'] = episode['episodeNumber'] or 0
-                ep_info['seasonNumber'] = episode['seasonNumber'] or 0
+                #ep_info = self._base_title_info(episode['tconst'])
+                ep_info = self.get_movie(episode['tconst'])
+                ep_info.series_id = movieID
+                ep_info.series_title = data['title']
+                ep_info.episode = ep_info['episodeNumber'] = episode['episodeNumber'] or 'unknown'
+                ep_info.season = ep_info['seasonNumber'] = episode['seasonNumber'] or 'unknown'
                 ep_info['episode of'] = data
-                episode = dict(ep_info)
-                season = episode.get('seasonNumber')
+                season = ep_info.get('seasonNumber')
                 if not season:
                     continue
-                seasons.setdefault(season, {}).setdefault(ep_info['episodeNumber'], episode)
+                seasons.setdefault(season, {}).setdefault(ep_info['episodeNumber'], ep_info)
                 seasonset.add(season)
             season_list = sorted(seasonset)
             data['episodes'] = seasons
