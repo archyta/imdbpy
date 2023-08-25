@@ -62,9 +62,9 @@ class IMDbS3AccessSystem(IMDbBase):
     def __init__(self, uri, adultSearch=True, *arguments, **keywords):
         """Initialize the access system."""
         IMDbBase.__init__(self, *arguments, **keywords)
-        self._engine = sqlalchemy.create_engine(uri, encoding='utf-8', echo=False)
+        self._engine = sqlalchemy.create_engine(uri, echo=False)
         self._metadata.bind = self._engine
-        self._metadata.reflect()
+        self._metadata.reflect(self._engine)
         self.T = self._metadata.tables
 
     def _rename(self, table, data):
@@ -95,7 +95,7 @@ class IMDbS3AccessSystem(IMDbBase):
         tb = self.T['title_basics']
         movie = tb.select(tb.c.tconst == movieID).execute().fetchone() or {}
         data = self._rename('title_basics', dict(movie))
-        # data['year'] = str(data.get('startYear') or '')
+        data['year'] = str(data.get('startYear') or '')
         # if 'endYear' in data and data['endYear']:
         #     data['year'] += '-%s' % data['endYear']
         genres = data.get('genres') or ''
@@ -162,10 +162,12 @@ class IMDbS3AccessSystem(IMDbBase):
         self._clean(te_data, ('parentTconst',))
         data.update(te_data)
 
-        # search parentTconst, construct episodes data
+        # 需要查找 parentTconst, 构造 episodes 数据域
         episodes = te.select(te.c.parentTconst == movieID).execute().fetchall() or {}
         if episodes:
-            episodes.sort(key=itemgetter('seasonNumber', 'episodeNumber'))
+            season_Nr = 1
+            episode_Nr = 1
+            # episodes.sort(key=itemgetter('seasonNumber', 'episodeNumber')) #不排序，可能会出现季和集编号没有(unknown)的情况
             # 构造seasons数据域
             seasons = {}
             seasonset = set()
@@ -175,8 +177,8 @@ class IMDbS3AccessSystem(IMDbBase):
                 ep_info = self.get_movie(episode['tconst'])
                 ep_info.series_id = movieID
                 ep_info.series_title = data['title']
-                ep_info.episode = ep_info['episodeNumber'] = episode['episodeNumber'] or 'unknown'
-                ep_info.season = ep_info['seasonNumber'] = episode['seasonNumber'] or 'unknown'
+                ep_info.episode = ep_info['episodeNumber'] = episode['episodeNumber'] or None
+                ep_info.season = ep_info['seasonNumber'] = episode['seasonNumber'] or None
                 ep_info['episode of'] = data
                 season = ep_info.get('seasonNumber')
                 if not season:
@@ -257,6 +259,46 @@ class IMDbS3AccessSystem(IMDbBase):
     get_person_filmography = get_person_main
     get_person_biography = get_person_main
 
+
+    def _search_movie_ex(self, title, results, year, kind):
+        title = title.strip()
+        if not title:
+            return []
+        results = []
+        t_soundex = title_soundex(title)
+        tb = self.T['title_basics']
+        conditions = [tb.c.t_soundex == t_soundex]
+        if year:
+            conditions.append(tb.c.startYear == year)
+        # if kind in ['episode', 'movie', 'short', 'tv mini series', 'tv series', 'tv short', 'tv special', 'video', 'video game']:
+        if kind:
+            if isinstance(kind, list):
+                conditions.append(tb.c.titleType.in_(kind))
+            elif isinstance(kind, str):
+                conditions.append(tb.c.titleType == kind)
+        results = tb.select(sqlalchemy.and_(*conditions)).execute()
+        results = [(x['tconst'], self._clean(self._rename('title_basics', dict(x)), ('t_soundex',)))
+                   for x in results]
+
+        # Also search the AKAs
+        ta = self.T['title_akas']
+        if t_soundex is not None:
+            ta_conditions = [ta.c.t_soundex == t_soundex]
+        else:
+            ta_conditions = [ta.c.title.ilike('%%%s%%' % title)]
+        ta_results = ta.select(sqlalchemy.and_(*ta_conditions)).execute()
+        idset = set([x[0] for x in results]) if results else set()
+        ta_results = [(x['titleId'], self._clean(self._rename('title_akas', dict(x)), ('t_soundex',)))
+                      for x in ta_results if x['titleId'] not in idset and idset.add(x['titleId']) is None]
+        results += ta_results
+
+        results = scan_titles(results, title, ro_threshold=0.8, sort=False)
+        results = [x[1] for x in results]
+        return results
+
+
+
+
     def _search_movie(self, title, results, _episodes=False):
         title = title.strip()
         if not title:
@@ -267,6 +309,7 @@ class IMDbS3AccessSystem(IMDbBase):
         conditions = [tb.c.t_soundex == t_soundex]
         if _episodes:
             conditions.append(tb.c.titleType == 'episode')
+
         results = tb.select(sqlalchemy.and_(*conditions)).execute()
         results = [(x['tconst'], self._clean(self._rename('title_basics', dict(x)), ('t_soundex',)))
                    for x in results]
@@ -282,7 +325,7 @@ class IMDbS3AccessSystem(IMDbBase):
                       for x in ta_results]
         results += ta_results
 
-        results = scan_titles(results, title)
+        results = scan_titles(results, title, ro_threshold=0.8)
         results = [x[1] for x in results]
         return results
 

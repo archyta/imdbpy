@@ -309,7 +309,7 @@ def strip_article(title):
     return no_article_title
 
 
-def scan_titles(titles_list, title, results=0, ro_threshold=RO_THRESHOLD):
+def scan_titles(titles_list, title, results=0, ro_threshold=RO_THRESHOLD, sort=True):
     """Scan a list of titles, searching for best matches amongst some variations.
 
     :param titles_list: list of (movieID, {movie_data}) tuples
@@ -342,8 +342,9 @@ def scan_titles(titles_list, title, results=0, ro_threshold=RO_THRESHOLD):
             else:
                 resd[i] = (ratio, (i, t_data))
     res = list(resd.values())
-    res.sort()
-    res.reverse()
+    if sort:
+        res.sort()
+        res.reverse()
     if results > 0:
         res[:] = res[:results]
     return res

@@ -454,6 +454,47 @@ class IMDbBase:
                 data=md, modFunct=self._defModFunct,
                 accessSystem=self.accessSystem) for mi, md in res if mi and md][:results]
 
+    def _search_movie_ex(self, title, results, year, kind):
+        """Return a list of tuples (movieID, {movieData})"""
+        # XXX: for the real implementation, see the method of the
+        #      subclass, somewhere under the imdb.parser package.
+        raise NotImplementedError('override this method')
+
+    
+    def search_movie_ex(self, title, results=None, year=None, kind=None):
+        """Return a list of Movie objects for a query for the given title.
+        The results argument is the maximum number of results to return."""
+        if results is None:
+            results = self._results
+        try:
+            results = int(results)
+        except (ValueError, OverflowError):
+            results = 20
+        res = self._search_movie_ex(title, results, year, kind)
+        return [Movie.Movie(movieID=self._get_real_movieID(mi),
+                            data=md, modFunct=self._defModFunct,
+                            accessSystem=self.accessSystem) for mi, md in res if mi and md][:results]
+
+    def search_episode_ex(self, series_title, seanson=None, episode=None, year=None, results=None):
+        """Return a list of Movie objects for a query for the given title.
+        The results argument is the maximum number of results to return."""
+        if results is None:
+            results = self._results
+        try:
+            results = int(results)
+        except (ValueError, OverflowError):
+            results = 20
+        res = self._search_episode_ex(series_title, seanson=seanson, episode=episode, year=year, results=results)
+        return [Movie.Movie(movieID=self._get_real_movieID(mi),
+                            data=md, modFunct=self._defModFunct,
+                            accessSystem=self.accessSystem) for mi, md in res if mi and md][:results]
+
+    def _search_episode_ex(self, series_title, seanson, episode, year, results):
+        """Return a list of tuples (movieID, {movieData})"""
+        # XXX: for the real implementation, see the method of the
+        #      subclass, somewhere under the imdb.parser package.
+        raise NotImplementedError('override this method')
+
     def _get_movie_list(self, list_, results):
         """Return a list of tuples (movieID, {movieData})"""
         # XXX: for the real implementation, see the method of the
