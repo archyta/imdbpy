@@ -261,9 +261,9 @@ class IMDbS3AccessSystem(IMDbBase):
 
 
     def _search_movie_ex(self, title, results, year, kind):
-        title = title.strip()
         if not title:
             return []
+        title = title.strip()
         results = []
         t_soundex = title_soundex(title)
         tb = self.T['title_basics']
