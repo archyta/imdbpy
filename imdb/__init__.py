@@ -470,7 +470,7 @@ class IMDbBase:
             results = int(results)
         except (ValueError, OverflowError):
             results = 20
-        res = self._search_movie_ex(title, results, year, kind)
+        res = self._search_movie_ex(title, year, kind)
         return [Movie.Movie(movieID=self._get_real_movieID(mi),
                             data=md, modFunct=self._defModFunct,
                             accessSystem=self.accessSystem) for mi, md in res if mi and md][:results]
