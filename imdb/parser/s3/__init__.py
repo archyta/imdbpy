@@ -292,7 +292,7 @@ class IMDbS3AccessSystem(IMDbBase):
                       for x in ta_results if x['titleId'] not in idset and idset.add(x['titleId']) is None]
         results += ta_results
 
-        results = scan_titles(results, title, ro_threshold=0.9, sort=False)
+        results = scan_titles(results, title, ro_threshold=0.8, sort=False)
         results = [x[1] for x in results]
         return results
 
