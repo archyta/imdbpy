@@ -281,16 +281,17 @@ class IMDbS3AccessSystem(IMDbBase):
                    for x in results]
 
         # Also search the AKAs
-        ta = self.T['title_akas']
-        if t_soundex is not None:
-            ta_conditions = [ta.c.t_soundex == t_soundex]
-        else:
-            ta_conditions = [ta.c.title.ilike('%%%s%%' % title)]
-        ta_results = ta.select(sqlalchemy.and_(*ta_conditions)).execute()
-        idset = set([x[0] for x in results]) if results else set()
-        ta_results = [(x['titleId'], self._clean(self._rename('title_akas', dict(x)), ('t_soundex',)))
-                      for x in ta_results if x['titleId'] not in idset and idset.add(x['titleId']) is None]
-        results += ta_results
+        if not results:  # 没有搜到结果，采取搜索title_akas表
+            ta = self.T['title_akas']
+            if t_soundex is not None:
+                ta_conditions = [ta.c.t_soundex == t_soundex]
+            else:
+                ta_conditions = [ta.c.title.ilike('%%%s%%' % title)]
+            ta_results = ta.select(sqlalchemy.and_(*ta_conditions)).execute()
+            idset = set([x[0] for x in results]) if results else set()
+            ta_results = [(x['titleId'], self._clean(self._rename('title_akas', dict(x)), ('t_soundex',)))
+                          for x in ta_results if x['titleId'] not in idset and idset.add(x['titleId']) is None]
+            results += ta_results
 
         results = scan_titles(results, title, ro_threshold=0.8, sort=False)
         results = [x[1] for x in results]
