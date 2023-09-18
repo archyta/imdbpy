@@ -260,7 +260,7 @@ class IMDbS3AccessSystem(IMDbBase):
     get_person_biography = get_person_main
 
 
-    def _search_movie_ex(self, title, results, year, kind):
+    def _search_movie_ex(self, title, year=None, kind=None):
         if not title:
             return []
         title = title.strip()
