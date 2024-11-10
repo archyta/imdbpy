@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
-
+import concurrent
 import os
 import glob
 import gzip
@@ -170,21 +170,26 @@ def import_file(fn, engine):
 
 
 def import_dir(dir_name, engine, cleanup=False):
-    """Import data from a series of .tsv.gz files.
+    """Import data from a series of .tsv.gz files in parallel.
 
     :param dir_name: directory containing the .tsv.gz files
     :type dir_name: str
     :param engine: SQLAlchemy engine
     :type engine: :class:`sqlalchemy.engine.base.Engine`
     """
-    for fn in glob.glob(os.path.join(dir_name, '*%s' % TSV_EXT)):
-        if not os.path.isfile(fn):
-            logging.debug('skipping file %s' % fn)
-            continue
-        import_file(fn, engine)
-        if cleanup:
-            logging.debug('Removing file %s' % fn)
-            os.remove(fn)
+    files = [fn for fn in glob.glob(os.path.join(dir_name, '*%s' % TSV_EXT)) if os.path.isfile(fn)]
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = {executor.submit(import_file, fn, engine): fn for fn in files}
+        for future in concurrent.futures.as_completed(futures):
+            fn = futures[future]
+            try:
+                future.result()
+                if cleanup:
+                    logging.debug('Removing file %s' % fn)
+                    os.remove(fn)
+            except Exception as e:
+                logging.error('Error processing file %s: %s' % (fn, e))
 
  
 if __name__ == '__main__':
