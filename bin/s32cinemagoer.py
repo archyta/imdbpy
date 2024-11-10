@@ -145,7 +145,7 @@ def import_file(fn, engine):
         except:
             pass
         insert = table.insert()
-        metadata.create_all(tables=[table])
+        metadata.create_all(connection, tables=[table])
         if HAS_TQDM and logger.isEnabledFor(logging.DEBUG):
             tqdm_ = tqdm
         else:
@@ -194,7 +194,8 @@ if __name__ == '__main__':
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     cleanup = args.cleanup
-    engine = sqlalchemy.create_engine(db_uri, encoding='utf-8', echo=False)
+    # engine = sqlalchemy.create_engine(db_uri, encoding='utf-8', echo=False)
+    engine = sqlalchemy.create_engine(db_uri, echo=False)
     metadata.bind = engine
     import_dir(dir_name, engine, cleanup)
 
