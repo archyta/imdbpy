@@ -28,6 +28,7 @@ import gzip
 import logging
 import argparse
 import sqlalchemy
+from sqlalchemy.orm import sessionmaker
 
 try:
     from tqdm import tqdm
@@ -127,7 +128,8 @@ def import_file(fn, engine):
     :type engine: :class:`sqlalchemy.engine.base.Engine`
     """
     logging.info('begin processing file %s' % fn)
-    connection = engine.connect()
+    Session = sessionmaker(bind=engine)
+    session = Session()
     count = 0
     nr_of_lines = 0
     fn_basename = os.path.basename(fn)
@@ -140,12 +142,12 @@ def import_file(fn, engine):
         logging.debug('headers of file %s: %s' % (fn, ','.join(headers)))
         table = build_table(fn_basename, headers)
         try:
-            table.drop()
+            table.drop(engine)
             logging.debug('table %s dropped' % table.name)
         except:
             pass
         insert = table.insert()
-        metadata.create_all(connection, tables=[table])
+        metadata.create_all(engine, tables=[table])
         if HAS_TQDM and logger.isEnabledFor(logging.DEBUG):
             tqdm_ = tqdm
         else:
@@ -153,15 +155,18 @@ def import_file(fn, engine):
         try:
             for block in generate_content(tqdm_(gz_file, total=nr_of_lines), headers, table):
                 try:
-                    connection.execute(insert, block)
+                    session.execute(insert, block)
+                    session.commit()
                 except Exception as e:
                     logging.error('error processing data: %d entries lost: %s' % (len(block), e))
+                    session.rollback()
                     continue
                 count += len(block)
                 percent = count * 100 / nr_of_lines
         except Exception as e:
             logging.error('error processing data on table %s: %s' % (table.name, e))
         logging.info('processed file %s: %d entries' % (fn, count))
+    session.close()
 
 
 def import_dir(dir_name, engine, cleanup=False):
